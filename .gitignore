@@ -1,0 +1,18 @@
+# Terraform working directories and state — never committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+
+# Local variable files, which may carry environment-specific or secret values.
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local tooling configuration.
+.claude/
