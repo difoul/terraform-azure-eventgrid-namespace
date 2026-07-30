@@ -55,9 +55,11 @@ Initial release. Bronze tier.
   [disabling public network access causes MQTT routing to fail](https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration),
   and this module hardcodes `public_network_access = "Disabled"`, so Terraform
   would apply a routing config successfully and the messages would silently never
-  arrive. The fields stay in the `mqtt` object type so the validation message can
-  explain why, rather than failing with a generic "unsupported attribute". Routing
-  needs a namespace with public access enabled, which is out of scope here.
+  arrive. The three fields remain declared in the `mqtt` object type because
+  Terraform silently discards object attributes it does not know: removing them
+  would drop a caller's routing config with no error at all, which is worse than
+  the plan-time rejection. Routing needs a namespace with public access enabled,
+  which is out of scope here.
   Consequently `managed_identity` has no consumer inside the module; it is retained
   as a standard supporting interface and exported for the central layer.
 

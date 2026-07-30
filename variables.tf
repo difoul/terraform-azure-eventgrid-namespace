@@ -130,9 +130,15 @@ variable "mqtt" {
     maximum_client_sessions_per_authentication_name = optional(number)
     maximum_session_expiry_in_hours                 = optional(number)
     alternative_authentication_name_sources         = optional(list(string))
-    route_topic_id                                  = optional(string)
-    static_routing_enrichments                      = optional(map(string), {})
-    dynamic_routing_enrichments                     = optional(map(string), {})
+
+    # Declared only so the validations below can reject them — main.tf never reads
+    # these three. Terraform silently discards object attributes that are not in
+    # the declared type, so deleting them would turn a plan-time error into no
+    # feedback at all: the caller's routing config would vanish and the namespace
+    # would come up with routing quietly absent.
+    route_topic_id              = optional(string)
+    static_routing_enrichments  = optional(map(string), {})
+    dynamic_routing_enrichments = optional(map(string), {})
   })
   default = { enabled = false }
 

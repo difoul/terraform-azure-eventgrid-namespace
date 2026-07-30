@@ -170,6 +170,12 @@ output "eventgrid_dns" {
   the routing config successfully and the messages would silently never arrive —
   the worst kind of no-op knob. If you need MQTT routing, you need a namespace
   with public access enabled, which is out of scope for this module.
+- **Those three fields are still declared in the `mqtt` type,** which looks odd
+  until you know why: Terraform silently discards object attributes that are not
+  in the declared type. Removing them would not produce an error — it would drop
+  the caller's routing config without a word and hand back a namespace that
+  quietly does not route. Declaring them is what lets the module reject them at
+  plan with an explanation. They are never read.
 - **`managed_identity` has no consumer inside the module,** because routing is
   rejected. It stays because it is a standard supporting interface and the
   identity is exported for the central layer, but enabling it changes nothing
