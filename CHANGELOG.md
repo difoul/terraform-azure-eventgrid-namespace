@@ -37,9 +37,11 @@ Initial release. Bronze tier.
 - MQTT broker support via the `mqtt` object: session limits and alternative
   authentication name sources.
 - `capacity` (throughput units), validated to 1–40.
-- `examples/basic/` and 20 `terraform test` validation runs covering every
-  validation rule, the precondition, the defaults, and the fullest
-  configuration.
+- `examples/basic/`, `examples/mqtt/` and 25 `terraform test` validation runs
+  covering every validation rule, the precondition, the defaults, null handling,
+  and the fullest configuration. `examples/mqtt/` shows the `azapi` companions an
+  MQTT namespace needs — topic space, client group, client, permission bindings —
+  since azurerm has no resources for them.
 
 ### Deliberately omitted
 

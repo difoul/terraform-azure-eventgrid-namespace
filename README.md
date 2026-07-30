@@ -15,10 +15,11 @@ layer**'s.
 > namespace-topic event subscriptions. This is a provider gap, not a scope
 > decision, and it has two consequences you must plan for:
 >
-> - **MQTT is unusable until you configure it outside Terraform.** A client cannot
->   connect without a topic space and a permission binding, and MQTT access control
->   is permission bindings — *not* Azure RBAC — so the central assignment layer does
->   not cover it. Use `azapi`, the CLI, or the portal.
+> - **MQTT needs sub-resources this module cannot create.** A client cannot connect
+>   without a topic space and a permission binding, and MQTT access control is
+>   permission bindings — *not* Azure RBAC — so the central assignment layer does
+>   not cover it. Create them with `azapi` in the same root module:
+>   **[`examples/mqtt/`](examples/mqtt/)** is a complete, verified example.
 > - **Pull delivery needs an event subscription on the namespace topic,** which the
 >   provider cannot create either. `azurerm_eventgrid_event_subscription` targets
 >   Basic-tier topics and resource scopes, not namespace topics.
@@ -107,11 +108,12 @@ module "eventgrid_namespace" {
 }
 ```
 
-This gives you a broker and a `topicspace` private endpoint, and nothing else.
-Creating the topic spaces, clients, client groups and permission bindings that
-make it usable is a separate, non-Terraform step — see the note at the top.
-`mqtt.route_topic_id` is rejected; MQTT routing cannot work on a private-only
-namespace.
+This gives you a broker and a `topicspace` private endpoint, and nothing else. A
+client cannot connect until a topic space, a client, a client group and a
+permission binding exist, and none of those have an azurerm resource — so they
+are created with `azapi` alongside this module. **[`examples/mqtt/`](examples/mqtt/)
+is a complete working configuration** of exactly that. `mqtt.route_topic_id` is
+rejected; MQTT routing cannot work on a private-only namespace.
 
 Register DNS from the output:
 
