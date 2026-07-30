@@ -47,8 +47,10 @@ Initial release. Bronze tier.
   `customer_managed_key` block, and the Azure security baseline records CMK as
   unsupported for Event Grid (MCSB DP-5). Reaching it would require moving the
   resource to `azapi`.
-- **`high_availability`, `backup`, `multi_region`** — above Bronze. Event Grid
-  also has no backup concept at any tier, and no `zones` argument.
+- **`high_availability`, `backup`, `multi_region`** — above Bronze. Event Grid also
+  has no backup concept at any tier. Zone redundancy is not a `zones` argument: ARM
+  has `isZoneRedundant`, azurerm exposes nothing equivalent, and it is immutable
+  after create — so the Silver upgrade cannot enable it on an existing namespace.
 - **Role assignments** — nothing the module creates needs a grant at create time.
 - **MQTT routing** — `mqtt.route_topic_id` and the two routing enrichment maps are
   rejected at plan rather than exposed. Azure documents that
@@ -73,7 +75,12 @@ Initial release. Bronze tier.
   undelivered events.
 - The provider builds this resource on the `2023-12-15-preview` Event Grid API
   while topics and domains are on `2025-02-15` GA; some ARM properties are not
-  yet exposed.
+  yet exposed. Two matter: `minimumTlsVersionAllowed`, so the module cannot pin
+  TLS 1.2 as the Well-Architected guide calls for, and `isZoneRedundant`.
+- `checkov` and `trivy` both report zero findings, and that is not evidence of
+  anything: neither ships a policy for `azurerm_eventgrid_namespace`. Checkov's
+  Event Grid policies all target `azurerm_eventgrid_topic` / `_domain` (Basic
+  tier); trivy has none. Do not treat a green scan here as a review.
 - `azurerm_eventgrid_namespace` exports no endpoint attribute, so the module has
   no endpoint output.
 - azurerm ships no resources for topic spaces, MQTT clients, client groups, CA

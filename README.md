@@ -36,7 +36,7 @@ Bronze. It implements `networking`, plus the supporting `managed_identity` and
 |---|---|
 | `networking` | ✓ one private endpoint per requested sub-resource |
 | `encryption` | **omitted** — `azurerm_eventgrid_namespace` exposes no `customer_managed_key` block, and the Azure security baseline for Event Grid records CMK as unsupported (MCSB DP-5). A no-op knob would be worse than its absence; data at rest is encrypted with Microsoft-managed keys |
-| `high_availability` | Silver, out of tier. There is also no `zones` argument — a namespace is zone-redundant automatically in regions that support availability zones |
+| `high_availability` | Silver, out of tier. azurerm exposes no zone-redundancy argument, but ARM has `isZoneRedundant` — see the note below before planning the Silver upgrade, because it is **immutable after create** |
 | `backup` | Gold, out of tier. Event Grid has no backup concept at all, so this interface stays absent at every tier |
 | `multi_region` | Platinum, out of tier |
 | `managed_identity` | ✓ optional system-assigned identity, exported for the central layer |
@@ -48,7 +48,8 @@ Bronze. It implements `networking`, plus the supporting `managed_identity` and
 |---|---|---|
 | `public_network_access` | `"Disabled"` (hardcoded) | Private networking only |
 | `sku` | `"Standard"` (hardcoded) | The only value the provider accepts; not a caller decision |
-| `inbound_ip_rule` | not exposed | Meaningless with public access disabled |
+| `inbound_ip_rule` | not exposed | Meaningless with public access disabled — ARM documents `inboundIpRules` as "considered only if PublicNetworkAccess is enabled" |
+| Minimum TLS version | **cannot be enforced** | ARM has `minimumTlsVersionAllowed`; azurerm exposes no equivalent, so the namespace takes the service default. See the note below |
 | `mqtt.route_topic_id` | rejected | Azure fails MQTT routing when public network access is disabled ([docs](https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration)). Terraform would apply the config and the messages would never arrive |
 | `mqtt.*_routing_enrichments` | rejected | Only decorate routed messages, so dead for the same reason |
 | Private DNS zone group | none | DNS is wired externally |
@@ -191,10 +192,29 @@ output "eventgrid_dns" {
   put them. Every other resource this module creates is tagged.
 - **The provider is behind the API here.** `azurerm_eventgrid_namespace` is built
   on the `2023-12-15-preview` Event Grid API, while topics and domains are on
-  `2025-02-15` GA. Some namespace properties present in the ARM schema — CMK
-  among them — are not yet exposed by azurerm. If CMK becomes a hard requirement
-  before the provider catches up, the namespace resource would have to move to
-  `azapi`; the interfaces, naming, tags and endpoints would not change.
+  `2025-02-15` GA. The whole resource is eight arguments and four blocks
+  (`capacity`, `location`, `name`, `public_network_access`, `resource_group_name`,
+  `sku`, `tags`, plus `identity`, `inbound_ip_rule`, `timeouts` and
+  `topic_spaces_configuration`); several namespace properties in the ARM schema
+  have no azurerm equivalent. The two that matter are below. Reaching any of them
+  means moving the namespace resource to `azapi`; the interfaces, naming, tags and
+  endpoints would not change.
+- **Minimum TLS version cannot be enforced.** ARM exposes
+  `minimumTlsVersionAllowed` (`1.0` / `1.1` / `1.2`) on the namespace; azurerm has
+  no equivalent argument, so the namespace takes whatever the service defaults to
+  and this module cannot pin it. The
+  [Well-Architected guide for Event Grid](https://learn.microsoft.com/azure/well-architected/service-guides/azure-event-grid#security)
+  calls for TLS 1.2 as the minimum. Note that the ARM reference contradicts itself
+  here — it offers a `1.0` / `1.1` / `1.2` enum while stating "Only TLS version 1.2
+  is supported" — so the effective default is worth confirming against a live
+  namespace (`az rest`) rather than assumed either way.
+- **Zone redundancy is set at create and never after.** ARM has `isZoneRedundant`,
+  which azurerm does not expose. Its default depends on the region: `true` where
+  availability zones exist, `false` where they do not — so a namespace is *not*
+  unconditionally zone-redundant. ARM also states "once specified, this property
+  cannot be updated." When `high_availability` arrives at Silver it maps to this
+  property, and it cannot be turned on in place: existing Bronze namespaces would
+  need replacement. That belongs in the Silver upgrade guide.
 - **`.terraform.lock.hcl`** is written and committed by the release pipeline.
 - **Before use:** the service assessment (usage guidelines and any per-environment
   custom roles for publisher/subscriber access) must be complete.
