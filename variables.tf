@@ -269,10 +269,18 @@ variable "networking" {
 variable "managed_identity" {
   nullable    = false
   description = <<-EOT
-    Optional system-assigned managed identity on the namespace. Enable it when
-    the namespace must reach another resource — MQTT routing to a route topic is
-    the usual case. The identity's principal ID is exported so the central
-    assignment layer can grant it access; this module grants nothing.
+    Optional system-assigned managed identity on the namespace.
+
+    Nothing this module builds consumes it. The one case that would have — MQTT
+    routing to a route topic, where the namespace authenticates as itself — is
+    rejected outright, because routing cannot work on a namespace with public
+    network access disabled. So enabling this changes nothing about how the
+    namespace behaves on its own.
+
+    It stays because it is a standard supporting interface and the identity has
+    to exist before anything can be granted to it: the principal ID is exported
+    as identity_principal_id for the central assignment layer. Enable it when
+    that layer needs a principal to grant. This module grants nothing.
   EOT
   type = object({
     enabled = optional(bool, false)

@@ -54,7 +54,8 @@ locals {
 # Event Grid Namespace
 #
 # No role assignments: nothing this module creates needs a grant at create time.
-# Access — including any grant on an MQTT route topic — is the central layer's.
+# Access is the central assignment layer's, and MQTT access is not Azure RBAC at
+# all — it is permission bindings, which live outside this module entirely.
 # ------------------------------------------------------------------------------
 
 resource "azurerm_eventgrid_namespace" "this" {
