@@ -226,6 +226,41 @@ run "rejects_invalid_lock_level" {
 }
 
 # ------------------------------------------------------------------------------
+# Null handling
+#
+# Every optional variable is nullable = false, so an explicit null falls back to
+# the default. Without that, a null aborted the plan with an internal "attribute
+# from null value" / "argument must not be null" error before any validation could
+# report anything useful.
+# ------------------------------------------------------------------------------
+
+run "explicit_nulls_fall_back_to_defaults" {
+  command = plan
+
+  variables {
+    mqtt             = null
+    lock             = null
+    topics           = null
+    tags             = null
+    capacity         = null
+    managed_identity = null
+    object_index     = null
+  }
+}
+
+run "null_inside_mqtt_falls_back_to_defaults" {
+  command = plan
+
+  variables {
+    mqtt = {
+      enabled                     = true
+      static_routing_enrichments  = null
+      dynamic_routing_enrichments = null
+    }
+  }
+}
+
+# ------------------------------------------------------------------------------
 # Preconditions
 # ------------------------------------------------------------------------------
 

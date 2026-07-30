@@ -3,6 +3,7 @@
 # ------------------------------------------------------------------------------
 
 variable "application_code" {
+  nullable    = false
   description = "Short application code, used to compose the resource name."
   type        = string
 
@@ -13,6 +14,7 @@ variable "application_code" {
 }
 
 variable "environment" {
+  nullable    = false
   description = "Environment. Drives the custom-role lookup (e.g. prd -> [PRD] ...)."
   type        = string
 
@@ -23,11 +25,13 @@ variable "environment" {
 }
 
 variable "location" {
+  nullable    = false
   description = "Azure region the Event Grid Namespace is deployed into."
   type        = string
 }
 
 variable "object_index" {
+  nullable    = false
   description = "3-digit object index. 000 means the module generates a random index."
   type        = string
   default     = "000"
@@ -39,27 +43,32 @@ variable "object_index" {
 }
 
 variable "target_resource_group_name" {
+  nullable    = false
   description = "Existing resource group the module deploys into. The module never creates a resource group."
   type        = string
 }
 
 variable "company" {
+  nullable    = false
   description = "Required governance tag."
   type        = string
 }
 
 variable "owner" {
+  nullable    = false
   description = "Required governance tag."
   type        = string
 }
 
 variable "tags" {
+  nullable    = false
   description = "Extra business tags. Cannot override governance or tracking tags."
   type        = map(string)
   default     = {}
 }
 
 variable "source_repo" {
+  nullable    = false
   description = "Consumer repo that triggered the deploy. Set by the pipeline via TF_VAR_source_repo."
   type        = string
 }
@@ -69,6 +78,7 @@ variable "source_repo" {
 # ------------------------------------------------------------------------------
 
 variable "capacity" {
+  nullable    = false
   description = "Throughput units for the namespace. Each unit adds ingress/egress capacity and connection quota."
   type        = number
   default     = 1
@@ -80,6 +90,7 @@ variable "capacity" {
 }
 
 variable "topics" {
+  nullable    = false
   description = <<-EOT
     Namespace topics to create, keyed by topic name. Adding or removing one
     does not disturb the others.
@@ -107,6 +118,7 @@ variable "topics" {
 }
 
 variable "mqtt" {
+  nullable    = false
   description = <<-EOT
     MQTT broker (topic spaces) configuration. Disabled by default; the namespace
     then serves pull and push delivery only.
@@ -181,10 +193,12 @@ variable "mqtt" {
   }
 
   # Enrichments only decorate routed messages, so they are dead for the same reason.
+  # coalesce, not a bare length(): an explicitly null map would make length() abort
+  # the whole plan with "argument must not be null" instead of reporting this rule.
   validation {
     condition = (
-      length(var.mqtt.static_routing_enrichments) == 0 &&
-      length(var.mqtt.dynamic_routing_enrichments) == 0
+      length(coalesce(var.mqtt.static_routing_enrichments, {})) == 0 &&
+      length(coalesce(var.mqtt.dynamic_routing_enrichments, {})) == 0
     )
     error_message = "mqtt.static_routing_enrichments and mqtt.dynamic_routing_enrichments only apply to routed messages, and mqtt.route_topic_id is not supported by this module. Leave both empty."
   }
@@ -199,6 +213,7 @@ variable "mqtt" {
 # ------------------------------------------------------------------------------
 
 variable "networking" {
+  nullable    = false
   description = <<-EOT
     Private networking. Endpoints are never registered in a Private DNS zone —
     DNS is wired externally from the private_endpoint_dns output.
@@ -245,6 +260,7 @@ variable "networking" {
 # ------------------------------------------------------------------------------
 
 variable "managed_identity" {
+  nullable    = false
   description = <<-EOT
     Optional system-assigned managed identity on the namespace. Enable it when
     the namespace must reach another resource — MQTT routing to a route topic is
@@ -258,6 +274,7 @@ variable "managed_identity" {
 }
 
 variable "lock" {
+  nullable    = false
   description = <<-EOT
     Optional resource lock to prevent accidental deletion.
       - enabled: create the management lock
