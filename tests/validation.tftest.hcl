@@ -39,8 +39,6 @@ run "fullest_configuration_plans_cleanly" {
       maximum_client_sessions_per_authentication_name = 10
       maximum_session_expiry_in_hours                 = 8
       alternative_authentication_name_sources         = ["ClientCertificateDns"]
-      static_routing_enrichments                      = { tenant = "contoso" }
-      dynamic_routing_enrichments                     = { device = "$${client.authenticationName}" }
     }
 
     managed_identity = { enabled = true }
@@ -244,7 +242,8 @@ run "rejects_topicspace_endpoint_without_mqtt" {
   expect_failures = [azurerm_private_endpoint.this]
 }
 
-run "rejects_route_topic_without_managed_identity" {
+// MQTT routing needs public network access, which the module always disables.
+run "rejects_route_topic_id" {
   command = plan
 
   variables {
@@ -252,8 +251,34 @@ run "rejects_route_topic_without_managed_identity" {
       enabled        = true
       route_topic_id = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.EventGrid/namespaces/ns/topics/route"
     }
-    managed_identity = { enabled = false }
+    managed_identity = { enabled = true }
   }
 
-  expect_failures = [azurerm_eventgrid_namespace.this]
+  expect_failures = [var.mqtt]
+}
+
+run "rejects_static_routing_enrichments" {
+  command = plan
+
+  variables {
+    mqtt = {
+      enabled                    = true
+      static_routing_enrichments = { tenant = "contoso" }
+    }
+  }
+
+  expect_failures = [var.mqtt]
+}
+
+run "rejects_dynamic_routing_enrichments" {
+  command = plan
+
+  variables {
+    mqtt = {
+      enabled                     = true
+      dynamic_routing_enrichments = { device = "$${client.authenticationName}" }
+    }
+  }
+
+  expect_failures = [var.mqtt]
 }

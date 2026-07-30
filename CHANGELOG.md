@@ -11,7 +11,7 @@ a variable — increments MAJOR.
 
 Nothing yet.
 
-## [0.1.0] - 2026-07-29
+## [0.1.0] - 2026-07-30
 
 Initial release. Bronze tier.
 
@@ -34,14 +34,11 @@ Initial release. Bronze tier.
 - **`lock` interface** — optional `CanNotDelete` / `ReadOnly` management lock.
 - Namespace topics via a `for_each` map (`topics`), so adding or removing one
   does not disturb the others. `event_retention_in_days` is validated to 1–7.
-- MQTT broker support via the `mqtt` object: session limits, alternative
-  authentication name sources, route topic, and static/dynamic routing
-  enrichments.
+- MQTT broker support via the `mqtt` object: session limits and alternative
+  authentication name sources.
 - `capacity` (throughput units), validated to 1–40.
-- A precondition requiring `managed_identity.enabled` when `mqtt.route_topic_id`
-  is set — the namespace routes to that topic as itself.
-- `examples/basic/` and 18 `terraform test` validation runs covering every
-  validation rule, both preconditions, the defaults, and the fullest
+- `examples/basic/` and 20 `terraform test` validation runs covering every
+  validation rule, the precondition, the defaults, and the fullest
   configuration.
 
 ### Deliberately omitted
@@ -53,6 +50,16 @@ Initial release. Bronze tier.
 - **`high_availability`, `backup`, `multi_region`** — above Bronze. Event Grid
   also has no backup concept at any tier, and no `zones` argument.
 - **Role assignments** — nothing the module creates needs a grant at create time.
+- **MQTT routing** — `mqtt.route_topic_id` and the two routing enrichment maps are
+  rejected at plan rather than exposed. Azure documents that
+  [disabling public network access causes MQTT routing to fail](https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration),
+  and this module hardcodes `public_network_access = "Disabled"`, so Terraform
+  would apply a routing config successfully and the messages would silently never
+  arrive. The fields stay in the `mqtt` object type so the validation message can
+  explain why, rather than failing with a generic "unsupported attribute". Routing
+  needs a namespace with public access enabled, which is out of scope here.
+  Consequently `managed_identity` has no consumer inside the module; it is retained
+  as a standard supporting interface and exported for the central layer.
 
 ### Known limitations
 
@@ -67,6 +74,14 @@ Initial release. Bronze tier.
   yet exposed.
 - `azurerm_eventgrid_namespace` exports no endpoint attribute, so the module has
   no endpoint output.
+- azurerm ships no resources for topic spaces, MQTT clients, client groups, CA
+  certificates, permission bindings, or namespace-topic event subscriptions — only
+  `azurerm_eventgrid_namespace` and `azurerm_eventgrid_namespace_topic`. An
+  MQTT-enabled namespace therefore needs a non-Terraform step (`azapi`, CLI,
+  portal) before any client can connect, and MQTT access control is permission
+  bindings rather than Azure RBAC, so the central assignment layer does not cover
+  it. Pull delivery likewise needs an event subscription the provider cannot
+  create.
 
 [Unreleased]: https://github.com/difoul/terraform-azure-eventgrid-namespace/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/difoul/terraform-azure-eventgrid-namespace/releases/tag/v0.1.0

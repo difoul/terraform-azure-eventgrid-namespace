@@ -118,11 +118,12 @@ variable "mqtt" {
       - maximum_session_expiry_in_hours: longest session expiry a client may request (1-8)
       - alternative_authentication_name_sources: client certificate fields accepted
           as the authentication name, in addition to the default
-      - route_topic_id: namespace topic MQTT messages are routed to. Requires
-          managed_identity.enabled; the grant on that topic is the central
-          assignment layer's job, not this module's
+      - route_topic_id: rejected. MQTT routing cannot work in this module —
+          Azure fails routing on any namespace with public network access
+          disabled, and this module disables it unconditionally. See the README.
       - static_routing_enrichments / dynamic_routing_enrichments: key/value pairs
-          added to routed messages
+          added to routed messages. Only meaningful with routing, so these are
+          rejected for the same reason.
   EOT
   type = object({
     enabled                                         = optional(bool, false)
@@ -162,6 +163,24 @@ variable "mqtt" {
       ], s)
     ])
     error_message = "mqtt.alternative_authentication_name_sources must be drawn from: ClientCertificateDns, ClientCertificateEmail, ClientCertificateIp, ClientCertificateSubject, ClientCertificateUri."
+  }
+
+  # MQTT routing needs public network access on the namespace, which this module
+  # disables unconditionally. Terraform would apply a routing config happily and
+  # the messages would then never arrive, so reject it at plan time instead of
+  # shipping a knob that silently does nothing.
+  validation {
+    condition     = var.mqtt.route_topic_id == null
+    error_message = "mqtt.route_topic_id is not supported: Azure fails MQTT routing on any namespace with public network access disabled, and this module hardcodes public_network_access = \"Disabled\". Route MQTT messages from a namespace built outside this module, or consume them from a topic space directly. See https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration"
+  }
+
+  # Enrichments only decorate routed messages, so they are dead for the same reason.
+  validation {
+    condition = (
+      length(var.mqtt.static_routing_enrichments) == 0 &&
+      length(var.mqtt.dynamic_routing_enrichments) == 0
+    )
+    error_message = "mqtt.static_routing_enrichments and mqtt.dynamic_routing_enrichments only apply to routed messages, and mqtt.route_topic_id is not supported by this module. Leave both empty."
   }
 }
 

@@ -76,29 +76,17 @@ resource "azurerm_eventgrid_namespace" "this" {
   }
 
   # MQTT broker. Changing this block forces a new namespace — see the README.
+  #
+  # No route_topic_id and no routing enrichments: MQTT routing requires public
+  # network access, which this module disables unconditionally, so var.mqtt
+  # rejects all three. Restoring them means dropping those validations and
+  # exposing public_network_access — not one without the other.
   dynamic "topic_spaces_configuration" {
     for_each = var.mqtt.enabled ? [var.mqtt] : []
     content {
       alternative_authentication_name_source          = topic_spaces_configuration.value.alternative_authentication_name_sources
       maximum_client_sessions_per_authentication_name = topic_spaces_configuration.value.maximum_client_sessions_per_authentication_name
       maximum_session_expiry_in_hours                 = topic_spaces_configuration.value.maximum_session_expiry_in_hours
-      route_topic_id                                  = topic_spaces_configuration.value.route_topic_id
-
-      dynamic "static_routing_enrichment" {
-        for_each = topic_spaces_configuration.value.static_routing_enrichments
-        content {
-          key   = static_routing_enrichment.key
-          value = static_routing_enrichment.value
-        }
-      }
-
-      dynamic "dynamic_routing_enrichment" {
-        for_each = topic_spaces_configuration.value.dynamic_routing_enrichments
-        content {
-          key   = dynamic_routing_enrichment.key
-          value = dynamic_routing_enrichment.value
-        }
-      }
     }
   }
 
@@ -108,11 +96,6 @@ resource "azurerm_eventgrid_namespace" "this" {
     precondition {
       condition     = local.name_length <= 50
       error_message = "Composed namespace name '${local.name_raw}' exceeds 50 characters; shorten application_code."
-    }
-
-    precondition {
-      condition     = !var.mqtt.enabled || var.mqtt.route_topic_id == null || var.managed_identity.enabled
-      error_message = "mqtt.route_topic_id requires managed_identity.enabled = true; the namespace routes to the topic with its own identity, and the central layer grants it access."
     }
   }
 }

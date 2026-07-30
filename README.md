@@ -4,10 +4,24 @@ Deploys one Azure Event Grid **Namespace** per application per environment,
 together with its namespace topics, its optional MQTT broker, and its private
 endpoints. Public network access is off and cannot be turned on.
 
-The module is control plane only. It does **not** create event subscriptions,
-MQTT clients, client groups or topic spaces, and it grants **no** RBAC. Access —
-including any grant the namespace's own identity needs on an MQTT route topic —
-is granted by the **central assignment layer**.
+The module is control plane only: it builds the namespace, its topics and its
+endpoints, and grants **no** RBAC. Data-plane access is the **central assignment
+layer**'s.
+
+> **The namespace is not fully wireable in Terraform.** azurerm ships exactly two
+> resources for this service — `azurerm_eventgrid_namespace` and
+> `azurerm_eventgrid_namespace_topic`. There is **no** resource for topic spaces,
+> MQTT clients, client groups, CA certificates, permission bindings, or
+> namespace-topic event subscriptions. This is a provider gap, not a scope
+> decision, and it has two consequences you must plan for:
+>
+> - **MQTT is unusable until you configure it outside Terraform.** A client cannot
+>   connect without a topic space and a permission binding, and MQTT access control
+>   is permission bindings — *not* Azure RBAC — so the central assignment layer does
+>   not cover it. Use `azapi`, the CLI, or the portal.
+> - **Pull delivery needs an event subscription on the namespace topic,** which the
+>   provider cannot create either. `azurerm_eventgrid_event_subscription` targets
+>   Basic-tier topics and resource scopes, not namespace topics.
 
 This module covers the namespace model (MQTT broker, pull delivery, namespace
 topics). Custom topics (`azurerm_eventgrid_topic`) and domains
@@ -35,6 +49,8 @@ Bronze. It implements `networking`, plus the supporting `managed_identity` and
 | `public_network_access` | `"Disabled"` (hardcoded) | Private networking only |
 | `sku` | `"Standard"` (hardcoded) | The only value the provider accepts; not a caller decision |
 | `inbound_ip_rule` | not exposed | Meaningless with public access disabled |
+| `mqtt.route_topic_id` | rejected | Azure fails MQTT routing when public network access is disabled ([docs](https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration)). Terraform would apply the config and the messages would never arrive |
+| `mqtt.*_routing_enrichments` | rejected | Only decorate routed messages, so dead for the same reason |
 | Private DNS zone group | none | DNS is wired externally |
 | Name | composed, never passed in | The naming convention is enforced, not trusted |
 | Role assignments | none | Nothing the module creates needs a grant at create time |
@@ -75,23 +91,26 @@ module "eventgrid_namespace" {
 }
 ```
 
-With the MQTT broker and a route topic:
+With the MQTT broker:
 
 ```hcl
 module "eventgrid_namespace" {
   # ... as above ...
 
-  managed_identity = { enabled = true }
-
   mqtt = {
     enabled                                         = true
     maximum_client_sessions_per_authentication_name = 10
     maximum_session_expiry_in_hours                 = 8
-    route_topic_id                                  = "<namespace topic resource ID>"
-    static_routing_enrichments                      = { tenant = "contoso" }
+    alternative_authentication_name_sources         = ["ClientCertificateDns"]
   }
 }
 ```
+
+This gives you a broker and a `topicspace` private endpoint, and nothing else.
+Creating the topic spaces, clients, client groups and permission bindings that
+make it usable is a separate, non-Terraform step — see the note at the top.
+`mqtt.route_topic_id` is rejected; MQTT routing cannot work on a private-only
+namespace.
 
 Register DNS from the output:
 
@@ -144,11 +163,17 @@ output "eventgrid_dns" {
   off, or changing any value inside the `mqtt` object, forces a **new namespace** —
   the existing one is destroyed and recreated, and all MQTT sessions and
   undelivered events are lost. Decide on MQTT before the first apply.
-- **`mqtt.route_topic_id` requires `managed_identity.enabled = true`,** enforced
-  by a precondition. The namespace routes to that topic as itself; the role
-  assignment on the target topic is the central layer's job, not this module's.
-  The route topic is not created here — pass in the ID of one of this module's
-  own topics (`topic_ids`) or an external one.
+- **MQTT routing is rejected, not merely unimplemented.** Azure documents that
+  [disabling public network access causes MQTT routing to fail](https://learn.microsoft.com/azure/event-grid/mqtt-routing#routing-configuration),
+  and this module disables it unconditionally. Setting `mqtt.route_topic_id` (or
+  either routing enrichment map) fails at plan. Terraform would otherwise apply
+  the routing config successfully and the messages would silently never arrive —
+  the worst kind of no-op knob. If you need MQTT routing, you need a namespace
+  with public access enabled, which is out of scope for this module.
+- **`managed_identity` has no consumer inside the module,** because routing is
+  rejected. It stays because it is a standard supporting interface and the
+  identity is exported for the central layer, but enabling it changes nothing
+  about how the namespace behaves on its own.
 - **No endpoint output.** `azurerm_eventgrid_namespace` exports only `id`; the
   provider surfaces no hostname attribute. Consumers derive the endpoint from
   the namespace name, or read it from `private_endpoint_dns`.
