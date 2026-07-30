@@ -111,7 +111,7 @@ variable "topics" {
   validation {
     condition = alltrue([
       for t in values(var.topics) :
-      t.event_retention_in_days >= 1 && t.event_retention_in_days <= 7
+      coalesce(t.event_retention_in_days, 7) >= 1 && coalesce(t.event_retention_in_days, 7) <= 7
     ])
     error_message = "topics[*].event_retention_in_days must be between 1 and 7."
   }
@@ -154,20 +154,24 @@ variable "mqtt" {
   })
   default = { enabled = false }
 
+  # Both optional and unset by default, so both are null on a normal call. Guard
+  # that with coalesce and never with `x == null || x >= 1`: Terraform does not
+  # guarantee short-circuit evaluation of || and &&, so the comparison can still be
+  # evaluated against the null and abort the plan with "argument must not be null".
+  # The fallback is 1 because it is in range for both rules and is also Azure's own
+  # default for both properties, so a null reads as "leave it to the service".
   validation {
     condition = (
-      var.mqtt.maximum_client_sessions_per_authentication_name == null ||
-      (var.mqtt.maximum_client_sessions_per_authentication_name >= 1 &&
-      var.mqtt.maximum_client_sessions_per_authentication_name <= 100)
+      coalesce(var.mqtt.maximum_client_sessions_per_authentication_name, 1) >= 1 &&
+      coalesce(var.mqtt.maximum_client_sessions_per_authentication_name, 1) <= 100
     )
     error_message = "mqtt.maximum_client_sessions_per_authentication_name must be between 1 and 100."
   }
 
   validation {
     condition = (
-      var.mqtt.maximum_session_expiry_in_hours == null ||
-      (var.mqtt.maximum_session_expiry_in_hours >= 1 &&
-      var.mqtt.maximum_session_expiry_in_hours <= 8)
+      coalesce(var.mqtt.maximum_session_expiry_in_hours, 1) >= 1 &&
+      coalesce(var.mqtt.maximum_session_expiry_in_hours, 1) <= 8
     )
     error_message = "mqtt.maximum_session_expiry_in_hours must be between 1 and 8."
   }
@@ -233,9 +237,12 @@ variable "networking" {
     integration_subnet_id = optional(string)
   })
 
+  # coalesce on private_endpoints, and coalesce inside the IP check rather than an
+  # `== null ||` guard, for the same reason as the mqtt rules above: no reliance on
+  # short-circuit evaluation or on a null being replaced by the optional default.
   validation {
     condition = alltrue([
-      for k in keys(var.networking.private_endpoints) :
+      for k in keys(coalesce(var.networking.private_endpoints, {})) :
       contains(["topic", "topicspace"], k)
     ])
     error_message = "Supported private endpoint sub-resources: topic, topicspace."
@@ -243,8 +250,8 @@ variable "networking" {
 
   validation {
     condition = alltrue([
-      for pe in values(var.networking.private_endpoints) :
-      pe.private_ip_address == null || can(cidrhost("${pe.private_ip_address}/32", 0))
+      for pe in values(coalesce(var.networking.private_endpoints, {})) :
+      can(cidrhost("${coalesce(pe.private_ip_address, "0.0.0.0")}/32", 0))
     ])
     error_message = "Each private_endpoints[*].private_ip_address must be a valid IP address."
   }
@@ -287,7 +294,7 @@ variable "lock" {
   default = { enabled = false }
 
   validation {
-    condition     = contains(["CanNotDelete", "ReadOnly"], var.lock.level)
+    condition     = contains(["CanNotDelete", "ReadOnly"], coalesce(var.lock.level, "CanNotDelete"))
     error_message = "lock.level must be one of: CanNotDelete, ReadOnly."
   }
 }

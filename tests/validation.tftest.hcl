@@ -260,6 +260,47 @@ run "null_inside_mqtt_falls_back_to_defaults" {
   }
 }
 
+// The optional-with-no-default attributes are null on every ordinary call, so no
+// validation may rely on || short-circuiting to skip a comparison against them.
+run "null_optionals_without_defaults_pass_validation" {
+  command = plan
+
+  variables {
+    mqtt = {
+      enabled                                         = true
+      maximum_client_sessions_per_authentication_name = null
+      maximum_session_expiry_in_hours                 = null
+      alternative_authentication_name_sources         = null
+      route_topic_id                                  = null
+    }
+    networking = {
+      subnet_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-myapp-dev-001/providers/Microsoft.Network/virtualNetworks/vnet-myapp-dev-001/subnets/snet-privatelink"
+      private_endpoints     = { topic = { private_ip_address = null } }
+      integration_subnet_id = null
+    }
+  }
+}
+
+run "null_inside_topics_and_lock_falls_back" {
+  command = plan
+
+  variables {
+    topics = { orders = { event_retention_in_days = null } }
+    lock   = { enabled = true, level = null }
+  }
+}
+
+run "null_private_endpoints_map_falls_back" {
+  command = plan
+
+  variables {
+    networking = {
+      subnet_id         = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-myapp-dev-001/providers/Microsoft.Network/virtualNetworks/vnet-myapp-dev-001/subnets/snet-privatelink"
+      private_endpoints = null
+    }
+  }
+}
+
 # ------------------------------------------------------------------------------
 # Preconditions
 # ------------------------------------------------------------------------------
